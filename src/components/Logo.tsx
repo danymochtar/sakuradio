@@ -31,6 +31,16 @@ export function Logo({ size = 34, color }: LogoProps) {
       accessibilityLabel="Saku"
       style={{ flexDirection: 'row', alignItems: 'center', gap: size * 0.28 }}
     >
+      <Text
+        style={{
+          fontFamily: fontFamily.displaySemiBold,
+          fontSize: size,
+          lineHeight: size * 1.12,
+          color: wordColor,
+        }}
+      >
+        saku
+      </Text>
       <View
         style={{
           width: mark,
@@ -51,16 +61,6 @@ export function Logo({ size = 34, color }: LogoProps) {
           }}
         />
       </View>
-      <Text
-        style={{
-          fontFamily: fontFamily.displaySemiBold,
-          fontSize: size,
-          lineHeight: size * 1.12,
-          color: wordColor,
-        }}
-      >
-        saku
-      </Text>
     </View>
   );
 }

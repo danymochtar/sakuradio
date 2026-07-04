@@ -37,9 +37,10 @@ export function Logo({ size = 34, color }: LogoProps) {
           fontSize: size,
           lineHeight: size * 1.12,
           color: wordColor,
+          letterSpacing: size * 0.02,
         }}
       >
-        saku
+        SAKU
       </Text>
       <View
         style={{

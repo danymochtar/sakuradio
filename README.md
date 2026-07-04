@@ -98,6 +98,13 @@ npm run db:migrate        # prisma migrate dev (creates DB if missing, makes new
 npm run db:studio         # browse data
 ```
 
+**Or migrate from CI** (if your machine can't reach the DB either): the
+`.github/workflows/db-migrate.yml` workflow runs the create-DB + migration from a
+GitHub-hosted runner (open network egress). Add a repo secret `DATABASE_URL`
+(Settings → Secrets and variables → Actions), then run the **DB migrate**
+workflow from the Actions tab. It creates `sakuradio` if missing and applies the
+committed migration.
+
 The initial migration (`prisma/migrations/*_init`) creates `users`, `plans`,
 `steps` with their enums, indexes, and cascade foreign keys. Use the singleton
 in `server/prisma.ts` from API code:

@@ -1,0 +1,60 @@
+name: DB migrate
+
+# Runs the Prisma migration against the Saku Postgres from a GitHub-hosted
+# runner, which (unlike the Claude sandbox) has open network egress to the DB
+# host. Trigger manually from the Actions tab.
+#
+# Setup (once): add a repo secret DATABASE_URL, e.g.
+#   postgresql://postgres:PASSWORD@194.233.66.15:5432/sakuradio?schema=public
+# Settings → Secrets and variables → Actions → New repository secret.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ensure database exists
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is not set. Add it in repo Settings → Secrets → Actions."
+            exit 1
+          fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          # Build an admin connection to the maintenance 'postgres' db and read the target db name.
+          read ADMIN_URL DB_NAME < <(node -e "const u=new URL(process.env.DATABASE_URL);const db=u.pathname.slice(1)||'sakuradio';u.pathname='/postgres';u.search='';console.log(u.toString(),db)")
+          echo "Ensuring database \"$DB_NAME\" exists…"
+          if psql "$ADMIN_URL" -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+            echo "Database already exists."
+          else
+            psql "$ADMIN_URL" -c "CREATE DATABASE \"${DB_NAME}\""
+            echo "Database created."
+          fi
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma migrate deploy
+
+      - name: Show tables
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          psql "$DATABASE_URL" -c "\dt" || true

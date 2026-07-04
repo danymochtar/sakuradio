@@ -2,14 +2,14 @@
  * GET /api/health — quick diagnostics you can hit in a browser.
  *
  * Reports which env vars are present (booleans only — no secret values) and
- * whether the database is reachable and migrated. Handy for verifying a fresh
- * deploy. Safe to delete once things are green.
+ * whether the database is reachable and migrated. Safe to delete once green.
  */
 
+import { toVercelHandler } from '../server/vercel';
 import { prisma } from '../server/prisma';
 import { json } from '../server/http';
 
-export async function GET(): Promise<Response> {
+export default toVercelHandler(async () => {
   const result: Record<string, unknown> = {
     env: {
       DATABASE_URL: Boolean(process.env.DATABASE_URL),
@@ -26,11 +26,11 @@ export async function GET(): Promise<Response> {
       const users = await prisma.user.count();
       result.tables = `migrated (${users} users)`;
     } catch {
-      result.tables = 'NOT migrated — run the DB migration (tables missing)';
+      result.tables = 'NOT migrated — tables missing';
     }
   } catch (e) {
     result.database = `ERROR: ${(e as Error).message.slice(0, 300)}`;
   }
 
   return json(result);
-}
+});

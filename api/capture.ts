@@ -2,12 +2,15 @@
  * POST /api/capture — { dream } → AI-simplified plan of steps, persisted.
  */
 
+import { toVercelHandler } from '../server/vercel';
 import { getUser } from '../server/session';
 import { simplifyDream } from '../server/ai';
 import { createPlanFromSteps } from '../server/plans';
 import { json, unauthorized, badRequest, serverError } from '../server/http';
 
-export async function POST(request: Request): Promise<Response> {
+export default toVercelHandler(async (request) => {
+  if (request.method !== 'POST') return badRequest('Use POST.');
+
   const user = await getUser(request);
   if (!user) return unauthorized();
 
@@ -29,4 +32,4 @@ export async function POST(request: Request): Promise<Response> {
     console.error('capture failed', err);
     return serverError('Could not create your plan right now. Try again in a moment.');
   }
-}
+});

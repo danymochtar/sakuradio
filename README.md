@@ -15,21 +15,43 @@ Full brand + product plan: [`docs/master-plan.md`](docs/master-plan.md).
 
 ---
 
-## Status — Phase 0: Design System
+## Status — MVP
 
-This repo currently contains the **brand + design-system foundation** every
-later screen reuses. No MVP features (auth, AI, backend) yet — those are Phase
-1+ (see the master plan roadmap).
+Full dream-to-action loop:
 
-The app's home screen (`App.tsx`) is a **living design-system showcase**:
-palette, typography, all `RadioDot` states, and a `ProgressChain`.
+1. **Sign in / up** — email + password (Better Auth).
+2. **Capture** a goal/dream → AI breaks it into 3–7 small, ordered steps
+   (Vercel AI Gateway, Claude Haiku) and saves it as a plan.
+3. **Home** shows your one active plan as a chain of `RadioDot`s — tap a dot to
+   complete a step (fill animation + success haptic), one at a time.
+4. **Finish** the plan to free the single free-tier active slot; other plans
+   queue and can be activated (the radio-group rule).
+
+`/showcase` still hosts the design-system reference.
 
 ## Stack
 
-- **Expo** (SDK 57) + **TypeScript**
-- **react-native-reanimated** (v4, worklets) — dot fill animation on the UI thread
-- **expo-haptics** — success/selection/impact feedback
-- **Poppins** (display) + **DM Sans** (body/UI) via `@expo-google-fonts/*`
+- **Expo** (SDK 57) + **TypeScript** + **Expo Router**
+- **react-native-reanimated** (v4) — dot fill animation · **expo-haptics**
+- **Poppins** / **DM Sans** (`@expo-google-fonts/*`)
+- **Backend**: Vercel serverless functions (`/api/*`)
+- **Better Auth** (email+password) · **Prisma + PostgreSQL** · **Vercel AI Gateway**
+
+## Architecture
+
+```
+app/            Expo Router screens (client): index gate, sign-in/up, home, capture, plans
+src/            client-only code: theme, components, hooks, authClient, api helpers
+api/            Vercel serverless functions (server): auth catch-all, capture, plans, steps
+server/         server-only logic: prisma singleton, session, plan ops, AI simplify
+lib/auth.ts     Better Auth server config (Prisma adapter)
+prisma/         schema + migration (users/sessions/accounts/verifications/plans/steps)
+```
+
+The client (`app/` + `src/`) is a static PWA. The backend (`api/` + `server/` +
+`lib/`) runs as Vercel functions and is **never** bundled into the client
+(verified: no Prisma / secrets in `dist/`). The web app calls `/api/*`
+same-origin; the native app uses `EXPO_PUBLIC_API_URL`.
 
 ## Run
 
@@ -69,9 +91,23 @@ npx expo export --platform ios --output-dir /tmp/saku-export   # native bundle
 
 ## Deploy (Vercel)
 
-`vercel.json` builds with `npm run build:web` and serves `dist/` as a static
-SPA (catch-all rewrite → `/`). Push to the connected repo, or deploy the
-current project directly from Vercel.
+`vercel.json` builds the client with `npm run build:web` (static SPA in `dist/`)
+and the SPA rewrite excludes `/api` so Vercel serves the `api/*` functions.
+Push to the connected repo to deploy.
+
+**Required environment variables** (Vercel → Settings → Environment Variables):
+
+| Var | Purpose |
+|-----|---------|
+| `DATABASE_URL` | Postgres connection (the `sakuradio` database) |
+| `BETTER_AUTH_SECRET` | Session signing secret |
+| `BETTER_AUTH_URL` | Your production URL, e.g. `https://sakuradio.vercel.app` (correct auth cookies) |
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key (powers `/api/capture`) |
+| `AI_MODEL` | *optional* — gateway model id, defaults to `anthropic/claude-haiku-4.5` |
+
+Run the DB migration once (see below) before first use. Prisma's client is
+generated on install via the `postinstall` hook, with a `rhel-openssl-3.0.x`
+binary target for Vercel's serverless runtime.
 
 ## Database (Prisma + PostgreSQL)
 
@@ -105,43 +141,14 @@ GitHub-hosted runner (open network egress). Add a repo secret `DATABASE_URL`
 workflow from the Actions tab. It creates `sakuradio` if missing and applies the
 committed migration.
 
-The initial migration (`prisma/migrations/*_init`) creates `users`, `plans`,
-`steps` with their enums, indexes, and cascade foreign keys. Use the singleton
-in `server/prisma.ts` from API code:
+The migration (`prisma/migrations/*_init`) creates the Better Auth tables
+(`users`, `sessions`, `accounts`, `verifications`) and the product tables
+(`plans`, `steps`) with their enums, indexes, and cascade foreign keys. Use the
+singleton in `server/prisma.ts` from server code:
 
 ```ts
 import { prisma } from './server/prisma';
 const plans = await prisma.plan.findMany({ where: { userId, status: 'ACTIVE' } });
-```
-
-## Layout
-
-```
-App.tsx                       design-system showcase (Phase 0 deliverable)
-src/
-  theme/
-    colors.ts                 palette + light/dark semantic color roles
-    typography.ts             Poppins/DM Sans type scale + font family keys
-    spacing.ts                4pt spacing scale + radius tokens
-    theme.ts                  assembles lightTheme / darkTheme + Theme type
-    ThemeProvider.tsx         <ThemeProvider> + useTheme() / useThemePreference()
-  hooks/
-    useHaptic.ts              best-effort haptic wrapper (never gates the UI)
-  components/
-    RadioDot.tsx              signature primitive: empty | active | filled
-    ProgressChain.tsx         vertical chain of dots = "one at a time"
-  pwa/
-    registerPwa.web.ts        web: inject manifest/icons + register SW
-    registerPwa.ts            native no-op
-public/                       copied to web root: manifest, sw.js, icons
-scripts/generate-icons.mjs    rasterize icon.svg → PWA PNGs (sharp)
-vercel.json                   static-SPA deploy config
-prisma/
-  schema.prisma               User / Plan / Step models (radio-button rules)
-  migrations/                 committed init migration (users, plans, steps)
-server/prisma.ts              PrismaClient singleton (server-only)
-.env.example                  DATABASE_URL template (.env is gitignored)
-docs/master-plan.md           brand identity + full roadmap
 ```
 
 ## Design rules

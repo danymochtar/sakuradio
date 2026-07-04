@@ -5,11 +5,12 @@
 // step by step. Step status maps 1:1 to the <RadioDot> states in the app:
 //   PENDING = empty · ACTIVE = active (current, "one at a time") · DONE = filled
 //
-// Docs: https://docs.expo.dev/versions/v57.0.0/ (app) — this schema is the
-// server-side data layer (Prisma + PostgreSQL), consumed by the API in later phases.
+// User/Session/Account/Verification are the Better Auth tables (email+password).
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // native for local dev; rhel-openssl-3.0.x for Vercel serverless functions.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -17,19 +18,76 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// A person using Saku. `externalId` will hold the auth provider id (Clerk) later.
-model User {
-  id          String   @id @default(cuid())
-  externalId  String?  @unique
-  email       String?  @unique
-  displayName String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// ─── Auth (Better Auth) ──────────────────────────────────────────────────────
 
-  plans Plan[]
+/// A person using Saku. Managed by Better Auth; also owns their plans.
+model User {
+  id            String   @id @default(cuid())
+  name          String?
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+  plans    Plan[]
 
   @@map("users")
 }
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  /// Hashed password for the email+password ("credential") provider.
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verifications")
+}
+
+// ─── Product (plans & steps) ─────────────────────────────────────────────────
 
 enum PlanStatus {
   ACTIVE

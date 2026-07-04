@@ -3,9 +3,11 @@
     "name": "Saku",
     "slug": "sakuradio",
     "version": "1.0.0",
+    "scheme": "saku",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router"],
     "ios": {
       "supportsTablet": true
     },

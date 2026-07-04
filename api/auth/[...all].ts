@@ -1,14 +1,13 @@
 /**
  * Vercel serverless function — mounts Better Auth at /api/auth/*.
  *
- * The auth config is imported lazily INSIDE the handler so that any
- * initialization error surfaces as a readable JSON 500 (via the adapter's
- * try/catch) instead of a generic FUNCTION_INVOCATION_FAILED crash.
+ * Static import so Vercel's bundler traces + includes lib/auth (a dynamic
+ * import is NOT traced and 404s at runtime). getAuth() constructs better-auth
+ * lazily on first request, so init errors return as JSON via the adapter's
+ * try/catch instead of a load-time crash.
  */
 
 import { toVercelHandler } from '../../server/vercel';
+import { getAuth } from '../../lib/auth';
 
-export default toVercelHandler(async (request) => {
-  const { auth } = await import('../../lib/auth');
-  return auth.handler(request);
-});
+export default toVercelHandler((request) => getAuth().handler(request));

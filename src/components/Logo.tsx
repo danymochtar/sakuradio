@@ -59,7 +59,7 @@ export function Logo({ size = 34, color }: LogoProps) {
           color: wordColor,
         }}
       >
-        Saku
+        saku
       </Text>
     </View>
   );

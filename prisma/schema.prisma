@@ -1,0 +1,86 @@
+// SAKU data model — the radio-button philosophy, in tables.
+//
+// A user captures a *dream* → it becomes a Plan of sequential Steps. Free tier =
+// exactly ONE active plan at a time (a radio group, not checkboxes), worked
+// step by step. Step status maps 1:1 to the <RadioDot> states in the app:
+//   PENDING = empty · ACTIVE = active (current, "one at a time") · DONE = filled
+//
+// Docs: https://docs.expo.dev/versions/v57.0.0/ (app) — this schema is the
+// server-side data layer (Prisma + PostgreSQL), consumed by the API in later phases.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A person using Saku. `externalId` will hold the auth provider id (Clerk) later.
+model User {
+  id          String   @id @default(cuid())
+  externalId  String?  @unique
+  email       String?  @unique
+  displayName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  plans Plan[]
+
+  @@map("users")
+}
+
+enum PlanStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+/// A dream turned into an actionable plan. Free tier keeps one ACTIVE plan per
+/// user; the app enforces the radio-group rule and marks it via `isActive`.
+model Plan {
+  id          String     @id @default(cuid())
+  userId      String
+  title       String
+  /// The raw "dream" / intention captured conversationally, pre-simplification.
+  dream       String?
+  status      PlanStatus @default(ACTIVE)
+  /// True for the single plan the user is currently focused on (free tier = 1).
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  completedAt DateTime?
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps Step[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@map("plans")
+}
+
+enum StepStatus {
+  PENDING
+  ACTIVE
+  DONE
+}
+
+/// A single next-action within a plan. `order` gives the sequence; single-tasking
+/// means at most one ACTIVE step per plan (enforced in app logic).
+model Step {
+  id          String     @id @default(cuid())
+  planId      String
+  title       String
+  order       Int
+  status      StepStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  completedAt DateTime?
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, order])
+  @@index([planId, status])
+  @@map("steps")
+}

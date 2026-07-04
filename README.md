@@ -73,6 +73,40 @@ npx expo export --platform ios --output-dir /tmp/saku-export   # native bundle
 SPA (catch-all rewrite → `/`). Push to the connected repo, or deploy the
 current project directly from Vercel.
 
+## Database (Prisma + PostgreSQL)
+
+The **server-side** data layer. Prisma models `User → Plan → Step`, encoding the
+radio-button product rules: one **active** plan per user (free tier), steps
+worked one at a time. `StepStatus` maps 1:1 to `<RadioDot>`:
+`PENDING → empty`, `ACTIVE → active`, `DONE → filled`.
+
+Prisma is Node-only and lives in `prisma/` + `server/` — never imported by the
+Expo app, never bundled into the client (verified: no `PrismaClient` and no
+`DATABASE_URL` in `dist/`).
+
+**Setup** (run where the DB host is reachable — the DB URL is not committed):
+
+```bash
+cp .env.example .env      # then set DATABASE_URL (…@HOST:5432/sakuradio)
+
+# Create the database if it doesn't exist (skip if migrate dev makes it for you):
+psql "postgresql://USER:PASSWORD@HOST:5432/postgres" -c "CREATE DATABASE sakuradio;"
+
+npm run db:deploy         # apply the committed init migration → tables
+# or, iterating on the schema:
+npm run db:migrate        # prisma migrate dev (creates DB if missing, makes new migrations)
+npm run db:studio         # browse data
+```
+
+The initial migration (`prisma/migrations/*_init`) creates `users`, `plans`,
+`steps` with their enums, indexes, and cascade foreign keys. Use the singleton
+in `server/prisma.ts` from API code:
+
+```ts
+import { prisma } from './server/prisma';
+const plans = await prisma.plan.findMany({ where: { userId, status: 'ACTIVE' } });
+```
+
 ## Layout
 
 ```
@@ -95,6 +129,11 @@ src/
 public/                       copied to web root: manifest, sw.js, icons
 scripts/generate-icons.mjs    rasterize icon.svg → PWA PNGs (sharp)
 vercel.json                   static-SPA deploy config
+prisma/
+  schema.prisma               User / Plan / Step models (radio-button rules)
+  migrations/                 committed init migration (users, plans, steps)
+server/prisma.ts              PrismaClient singleton (server-only)
+.env.example                  DATABASE_URL template (.env is gitignored)
 docs/master-plan.md           brand identity + full roadmap
 ```
 

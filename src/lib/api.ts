@@ -2,30 +2,29 @@
  * Thin fetch wrapper for the /api/* backend.
  *
  * Web: relative URLs, cookies sent automatically. Native: absolute base from
- * EXPO_PUBLIC_API_URL, with the Better Auth session cookie attached from
- * SecureStore. Throws on non-2xx with the response body for easier debugging.
+ * EXPO_PUBLIC_API_URL. Throws on non-2xx with the response body.
  */
 
 import { Platform } from 'react-native';
-import { authClient } from './authClient';
 
 const BASE = Platform.OS === 'web' ? '' : (process.env.EXPO_PUBLIC_API_URL ?? '');
 
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  if (Platform.OS !== 'web') {
-    // Expo client stores the session cookie; attach it on native requests.
-    const cookie = (authClient as unknown as { getCookie?: () => string }).getCookie?.();
-    if (cookie) headers.set('Cookie', cookie);
-  }
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-
   const res = await fetch(BASE + path, { ...init, headers, credentials: 'include' });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`${res.status} ${res.statusText}${text ? `: ${text}` : ''}`);
+    let message = `${res.status} ${res.statusText}`;
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      if (parsed.error) message = parsed.error;
+    } catch {
+      if (text) message += `: ${text}`;
+    }
+    throw new Error(message);
   }
   return res;
 }

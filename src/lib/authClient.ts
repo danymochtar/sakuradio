@@ -1,30 +1,95 @@
 /**
- * Better Auth client — safe to import from app/ and src/ (no server/Prisma code).
+ * Minimal auth client — talks to /api/auth/*. Safe for app/ and src/.
  *
- * Web: talks to the same origin (cookies just work). Native: points at the
- * deployed API via EXPO_PUBLIC_API_URL and stores the session in SecureStore.
+ * Web: same-origin, cookies automatic. Native: EXPO_PUBLIC_API_URL (cookie
+ * persistence to be added when the native client is wired). Exposes the same
+ * surface the screens use: useSession(), signIn.email, signUp.email, signOut.
  */
 
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { createAuthClient } from 'better-auth/react';
-import { expoClient } from '@better-auth/expo/client';
-import * as SecureStore from 'expo-secure-store';
 
-const webOrigin =
-  Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : undefined;
+const BASE = Platform.OS === 'web' ? '' : (process.env.EXPO_PUBLIC_API_URL ?? '');
 
-export const authClient = createAuthClient({
-  baseURL: Platform.OS === 'web' ? webOrigin : process.env.EXPO_PUBLIC_API_URL,
-  plugins:
-    Platform.OS === 'web'
-      ? []
-      : [
-          expoClient({
-            scheme: 'saku',
-            storagePrefix: 'saku',
-            storage: SecureStore,
-          }),
-        ],
-});
+export type SessionUser = { id: string; name: string | null; email: string };
+type SessionState = { data: { user: SessionUser } | null; isPending: boolean };
 
-export const { useSession, signIn, signUp, signOut } = authClient;
+let state: SessionState = { data: null, isPending: true };
+const listeners = new Set<() => void>();
+let started = false;
+
+function emit() {
+  listeners.forEach((l) => l());
+}
+
+async function refresh() {
+  try {
+    const res = await fetch(`${BASE}/api/auth/session`, { credentials: 'include' });
+    const json = (await res.json()) as { user: SessionUser | null };
+    state = { data: json.user ? { user: json.user } : null, isPending: false };
+  } catch {
+    state = { data: null, isPending: false };
+  }
+  emit();
+}
+
+export function useSession(): SessionState {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const l = () => force((n) => n + 1);
+    listeners.add(l);
+    if (!started) {
+      started = true;
+      refresh();
+    }
+    return () => {
+      listeners.delete(l);
+    };
+  }, []);
+  return state;
+}
+
+async function post(path: string, body: unknown) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
+  return json;
+}
+
+export const signUp = {
+  email: async (input: { name?: string; email: string; password: string }) => {
+    try {
+      await post('/api/auth/sign-up', input);
+      await refresh();
+      return { error: null as { message: string } | null };
+    } catch (e) {
+      return { error: { message: (e as Error).message } };
+    }
+  },
+};
+
+export const signIn = {
+  email: async (input: { email: string; password: string }) => {
+    try {
+      await post('/api/auth/sign-in', input);
+      await refresh();
+      return { error: null as { message: string } | null };
+    } catch (e) {
+      return { error: { message: (e as Error).message } };
+    }
+  },
+};
+
+export async function signOut() {
+  try {
+    await post('/api/auth/sign-out', {});
+  } catch {
+    /* ignore */
+  }
+  await refresh();
+}

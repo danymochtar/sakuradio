@@ -27,7 +27,7 @@ export default function SignIn() {
     const { error: err } = await signIn.email({ email: email.trim(), password });
     setLoading(false);
     if (err) {
-      setError(err.message || err.statusText || `Could not sign in (status ${err.status ?? '?'}).`);
+      setError(err.message || 'Could not sign in.');
       return;
     }
     router.replace('/home');

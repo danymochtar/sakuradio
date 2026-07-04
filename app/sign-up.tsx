@@ -35,7 +35,7 @@ export default function SignUp() {
     });
     setLoading(false);
     if (err) {
-      setError(err.message || err.statusText || `Could not create account (status ${err.status ?? '?'}).`);
+      setError(err.message || 'Could not create account.');
       return;
     }
     router.replace('/home');

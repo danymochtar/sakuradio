@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { Screen } from '../src/components/Screen';
+import { Logo } from '../src/components/Logo';
 import { Button } from '../src/components/Button';
 import { TextField } from '../src/components/TextField';
 import { signIn } from '../src/lib/authClient';
@@ -34,8 +35,8 @@ export default function SignIn() {
 
   return (
     <Screen scroll contentStyle={{ gap: theme.spacing.lg, flexGrow: 1, justifyContent: 'center' }}>
-      <View style={{ gap: theme.spacing.xs, marginBottom: theme.spacing.md }}>
-        <Text style={[theme.typography.display, { color: theme.colors.primary }]}>Saku</Text>
+      <View style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.md }}>
+        <Logo size={40} />
         <Text style={[theme.typography.body, { color: theme.colors.textMuted }]}>
           One thing at a time. Welcome back.
         </Text>

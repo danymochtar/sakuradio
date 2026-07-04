@@ -68,12 +68,24 @@ function setUser(user: SessionUser | null) {
   emit();
 }
 
+// Establish a session: prefer the user returned in the response; if it's
+// missing, fall back to reading the session cookie. Returns whether a session
+// is now active so callers never navigate into a signed-out state silently.
+async function establish(path: string, input: unknown): Promise<boolean> {
+  const { user } = await post(path, input);
+  if (user) {
+    setUser(user);
+    return true;
+  }
+  await refresh();
+  return state.data !== null;
+}
+
 export const signUp = {
   email: async (input: { name?: string; email: string; password: string }) => {
     try {
-      const { user } = await post('/api/auth/sign-up', input);
-      setUser(user ?? null);
-      return { error: null as { message: string } | null };
+      const ok = await establish('/api/auth/sign-up', input);
+      return { error: ok ? null : { message: 'Signed up, but no session was returned. Please try again.' } };
     } catch (e) {
       return { error: { message: (e as Error).message } };
     }
@@ -83,9 +95,8 @@ export const signUp = {
 export const signIn = {
   email: async (input: { email: string; password: string }) => {
     try {
-      const { user } = await post('/api/auth/sign-in', input);
-      setUser(user ?? null);
-      return { error: null as { message: string } | null };
+      const ok = await establish('/api/auth/sign-in', input);
+      return { error: ok ? null : { message: 'Signed in, but no session was returned. Please try again.' } };
     } catch (e) {
       return { error: { message: (e as Error).message } };
     }

@@ -19,7 +19,16 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "Saku",
+      "shortName": "Saku",
+      "description": "One thing at a time. AI dream-to-action planner for ADHD brains.",
+      "themeColor": "#3BA99C",
+      "backgroundColor": "#F7F6F2",
+      "lang": "en",
+      "display": "standalone"
     }
   }
 }

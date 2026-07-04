@@ -35,15 +35,43 @@ palette, typography, all `RadioDot` states, and a `ProgressChain`.
 
 ```bash
 npm install
-npx expo start        # then press i / a, or scan with Expo Go
+npx expo start        # native: press i / a, or scan with Expo Go
+npm run web           # web dev server
 ```
+
+## Web / PWA
+
+The showcase also ships as an installable **PWA** (the app that lives in your
+pocket). Web is a first-class target here — it's what deploys to Vercel.
+
+```bash
+npm run build:web     # → dist/ (static export, output: "single")
+npm run icons         # regenerate PWA icons from public/icon.svg (needs sharp)
+```
+
+PWA wiring:
+
+- `public/manifest.json`, `public/sw.js`, and the icons are copied to the site
+  root by Expo's static export.
+- `src/pwa/registerPwa.web.ts` injects the manifest link, `apple-touch-icon` +
+  iOS metas, and registers the service worker at runtime (web only; the native
+  `registerPwa.ts` is a no-op via Metro platform resolution).
+- `theme-color` / `description` come from `app.json` → `web` and land in the
+  static HTML directly.
 
 Verify the build headlessly (no device needed):
 
 ```bash
-npx tsc --noEmit                          # types
-npx expo export --platform ios --output-dir /tmp/saku-export   # Metro bundle
+npm run typecheck                         # types
+npm run build:web                         # web Metro bundle → dist/
+npx expo export --platform ios --output-dir /tmp/saku-export   # native bundle
 ```
+
+## Deploy (Vercel)
+
+`vercel.json` builds with `npm run build:web` and serves `dist/` as a static
+SPA (catch-all rewrite → `/`). Push to the connected repo, or deploy the
+current project directly from Vercel.
 
 ## Layout
 
@@ -61,6 +89,12 @@ src/
   components/
     RadioDot.tsx              signature primitive: empty | active | filled
     ProgressChain.tsx         vertical chain of dots = "one at a time"
+  pwa/
+    registerPwa.web.ts        web: inject manifest/icons + register SW
+    registerPwa.ts            native no-op
+public/                       copied to web root: manifest, sw.js, icons
+scripts/generate-icons.mjs    rasterize icon.svg → PWA PNGs (sharp)
+vercel.json                   static-SPA deploy config
 docs/master-plan.md           brand identity + full roadmap
 ```
 

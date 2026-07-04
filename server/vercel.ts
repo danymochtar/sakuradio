@@ -57,7 +57,12 @@ export function toVercelHandler(fn: (request: Request) => Promise<Response> | Re
       res.send(buf);
     } catch (err) {
       console.error('[api] handler error', err);
-      res.status(500).json({ error: (err as Error)?.message ?? 'Internal error' });
+      const e = err as Error;
+      res.status(500).json({
+        error: e?.message ?? 'Internal error',
+        // Temporary: surface the top of the stack to diagnose init crashes.
+        where: e?.stack?.split('\n').slice(0, 3).join(' | '),
+      });
     }
   };
 }

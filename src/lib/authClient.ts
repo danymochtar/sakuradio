@@ -56,16 +56,23 @@ async function post(path: string, body: unknown) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const json = (await res.json().catch(() => ({}))) as { error?: string };
+  const json = (await res.json().catch(() => ({}))) as { error?: string; user?: SessionUser };
   if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
   return json;
+}
+
+// Set session state straight from the auth response's user, so we don't depend
+// on the just-set cookie being immediately readable by a follow-up request.
+function setUser(user: SessionUser | null) {
+  state = { data: user ? { user } : null, isPending: false };
+  emit();
 }
 
 export const signUp = {
   email: async (input: { name?: string; email: string; password: string }) => {
     try {
-      await post('/api/auth/sign-up', input);
-      await refresh();
+      const { user } = await post('/api/auth/sign-up', input);
+      setUser(user ?? null);
       return { error: null as { message: string } | null };
     } catch (e) {
       return { error: { message: (e as Error).message } };
@@ -76,8 +83,8 @@ export const signUp = {
 export const signIn = {
   email: async (input: { email: string; password: string }) => {
     try {
-      await post('/api/auth/sign-in', input);
-      await refresh();
+      const { user } = await post('/api/auth/sign-in', input);
+      setUser(user ?? null);
       return { error: null as { message: string } | null };
     } catch (e) {
       return { error: { message: (e as Error).message } };
@@ -91,5 +98,5 @@ export async function signOut() {
   } catch {
     /* ignore */
   }
-  await refresh();
+  setUser(null);
 }
